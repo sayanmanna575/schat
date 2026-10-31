@@ -14,6 +14,7 @@ function formatTimestamp(isoString) {
 export default function ChatRoom({
   username,
   roomCode,
+  sessionId,
   participants,
   messages,
   onSendMessage,
@@ -26,6 +27,8 @@ export default function ChatRoom({
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  const onlineCount = participants.filter((p) => p.status !== 'disconnected').length;
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -78,7 +81,7 @@ export default function ChatRoom({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-accent opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-accent"></span>
               </span>
-              <span>{participants.length} {participants.length === 1 ? 'participant' : 'participants'} online</span>
+              <span>{onlineCount} {onlineCount === 1 ? 'participant' : 'participants'} online</span>
             </div>
           </div>
 
@@ -89,10 +92,12 @@ export default function ChatRoom({
             </div>
             <div className="overflow-y-auto space-y-1.5 pr-1 flex-1">
               {participants.map((p) => {
-                const isMe = p.id === currentSocketId;
+                const isMe = (sessionId && p.sessionId === sessionId) || p.id === currentSocketId;
+                const isDisconnected = p.status === 'disconnected';
+
                 return (
                   <div
-                    key={p.id}
+                    key={p.sessionId || p.id}
                     className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition ${
                       isMe
                         ? 'bg-navy-800/80 text-white border border-navy-700/60'
@@ -100,14 +105,28 @@ export default function ChatRoom({
                     }`}
                   >
                     <span className="truncate flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-accent/80 flex-shrink-0"></span>
-                      <span className="truncate">{p.username}</span>
-                    </span>
-                    {isMe && (
-                      <span className="text-[10px] text-cyan-accent uppercase tracking-wider font-semibold">
-                        You
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                          isDisconnected ? 'bg-amber-400 animate-pulse' : 'bg-cyan-accent'
+                        }`}
+                        title={isDisconnected ? 'Reconnecting...' : 'Online'}
+                      />
+                      <span className={`truncate ${isDisconnected ? 'text-slate-400 italic' : ''}`}>
+                        {p.username}
                       </span>
-                    )}
+                    </span>
+                    <span className="flex items-center gap-1.5 flex-shrink-0">
+                      {isDisconnected && (
+                        <span className="text-[9px] text-amber-400 font-normal">
+                          reconnecting
+                        </span>
+                      )}
+                      {isMe && (
+                        <span className="text-[10px] text-cyan-accent uppercase tracking-wider font-semibold">
+                          You
+                        </span>
+                      )}
+                    </span>
                   </div>
                 );
               })}
@@ -156,25 +175,39 @@ export default function ChatRoom({
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-xs text-slate-300">
                   <span className="h-2 w-2 rounded-full bg-cyan-accent"></span>
-                  <span>{participants.length} online</span>
+                  <span>{onlineCount} online</span>
                 </div>
               </div>
 
               <div className="flex-1 py-3 overflow-y-auto space-y-1">
                 <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-2">
-                  Members
+                  Members ({participants.length})
                 </div>
                 {participants.map((p) => {
-                  const isMe = p.id === currentSocketId;
+                  const isMe = (sessionId && p.sessionId === sessionId) || p.id === currentSocketId;
+                  const isDisconnected = p.status === 'disconnected';
+
                   return (
                     <div
-                      key={p.id}
+                      key={p.sessionId || p.id}
                       className={`flex items-center justify-between px-2.5 py-1.5 rounded text-xs ${
                         isMe ? 'bg-navy-800 text-white' : 'text-slate-300'
                       }`}
                     >
-                      <span className="truncate">{p.username}</span>
-                      {isMe && <span className="text-[10px] text-cyan-accent">You</span>}
+                      <span className="truncate flex items-center gap-1.5">
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            isDisconnected ? 'bg-amber-400' : 'bg-cyan-accent'
+                          }`}
+                        />
+                        <span className={isDisconnected ? 'italic text-slate-400' : ''}>
+                          {p.username}
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        {isDisconnected && <span className="text-[9px] text-amber-400">reconnecting</span>}
+                        {isMe && <span className="text-[10px] text-cyan-accent">You</span>}
+                      </span>
                     </div>
                   );
                 })}
@@ -209,7 +242,7 @@ export default function ChatRoom({
               title="View participants"
             >
               <Users size={15} />
-              <span className="text-[11px]">{participants.length}</span>
+              <span className="text-[11px]">{onlineCount}</span>
             </button>
 
             <div className="flex flex-col min-w-0">
@@ -219,7 +252,7 @@ export default function ChatRoom({
                 </span>
                 <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-cyan-accent"></span>
                 <span className="hidden sm:inline-block text-xs text-slate-400 font-normal">
-                  {participants.length} online
+                  {onlineCount} online
                 </span>
               </div>
             </div>
@@ -263,7 +296,7 @@ export default function ChatRoom({
                 );
               }
 
-              const isMe = msg.senderId === currentSocketId || msg.username === username;
+              const isMe = (sessionId && msg.sessionId === sessionId) || (currentSocketId && msg.senderId === currentSocketId);
 
               return (
                 <div
