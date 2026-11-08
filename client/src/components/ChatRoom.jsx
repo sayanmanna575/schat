@@ -28,19 +28,11 @@ export default function ChatRoom({
   const [inputText, setInputText] = useState('');
   const [isMobileMembersOpen, setIsMobileMembersOpen] = useState(false);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
-  const [viewportMetrics, setViewportMetrics] = useState(() => {
+  const [viewportHeight, setViewportHeight] = useState(() => {
     if (typeof window !== 'undefined' && window.visualViewport) {
-      return {
-        height: Math.round(window.visualViewport.height),
-        offsetTop: Math.round(window.visualViewport.offsetTop || 0),
-        offsetLeft: Math.round(window.visualViewport.offsetLeft || 0)
-      };
+      return Math.round(window.visualViewport.height);
     }
-    return {
-      height: typeof window !== 'undefined' ? window.innerHeight : null,
-      offsetTop: 0,
-      offsetLeft: 0
-    };
+    return typeof window !== 'undefined' ? window.innerHeight : null;
   });
 
   const messagesContainerRef = useRef(null);
@@ -57,55 +49,27 @@ export default function ChatRoom({
     isNearBottomRef.current = scrollHeight - scrollTop - clientHeight < 80;
   };
 
-  // Keep layout pinned to visual viewport and prevent mobile document scrolling
+  // Track visual viewport height dynamically for keyboard open/close
   useEffect(() => {
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
 
     const handleViewportUpdate = () => {
-      // Prevent browser from scrolling the window/document behind the keyboard
-      if (window.scrollY !== 0 || window.scrollX !== 0) {
-        window.scrollTo(0, 0);
-      }
-      if (document.body.scrollTop !== 0) {
-        document.body.scrollTop = 0;
-      }
-      if (document.documentElement.scrollTop !== 0) {
-        document.documentElement.scrollTop = 0;
-      }
-
-      if (vv) {
-        const height = Math.round(vv.height);
-        const offsetTop = Math.round(vv.offsetTop || 0);
-        const offsetLeft = Math.round(vv.offsetLeft || 0);
-        setViewportMetrics({ height, offsetTop, offsetLeft });
-        document.documentElement.style.setProperty('--app-height', `${height}px`);
-        document.documentElement.style.setProperty('--app-offset-top', `${offsetTop}px`);
-      } else {
-        const height = window.innerHeight;
-        setViewportMetrics({ height, offsetTop: 0, offsetLeft: 0 });
-        document.documentElement.style.setProperty('--app-height', `${height}px`);
-        document.documentElement.style.setProperty('--app-offset-top', '0px');
-      }
+      const height = vv ? Math.round(vv.height) : window.innerHeight;
+      setViewportHeight(height);
     };
 
     if (vv) {
       vv.addEventListener('resize', handleViewportUpdate);
-      vv.addEventListener('scroll', handleViewportUpdate);
     }
     window.addEventListener('resize', handleViewportUpdate);
-    window.addEventListener('orientationchange', handleViewportUpdate);
-    window.addEventListener('scroll', handleViewportUpdate, { passive: true });
 
     handleViewportUpdate();
 
     return () => {
       if (vv) {
         vv.removeEventListener('resize', handleViewportUpdate);
-        vv.removeEventListener('scroll', handleViewportUpdate);
       }
       window.removeEventListener('resize', handleViewportUpdate);
-      window.removeEventListener('orientationchange', handleViewportUpdate);
-      window.removeEventListener('scroll', handleViewportUpdate);
     };
   }, []);
 
@@ -117,7 +81,7 @@ export default function ChatRoom({
         behavior: 'auto'
       });
     }
-  }, [viewportMetrics.height]);
+  }, [viewportHeight]);
 
   // Auto-scroll inside messages container when new message arrives or typing changes
   useEffect(() => {
@@ -164,28 +128,17 @@ export default function ChatRoom({
   };
 
   const handleInputFocus = () => {
-    window.scrollTo(0, 0);
-    document.body.scrollTop = 0;
-    document.documentElement.scrollTop = 0;
-
-    requestAnimationFrame(() => {
-      window.scrollTo(0, 0);
-    });
-
-    // Anchor messages to bottom when keyboard opens
-    setTimeout(() => {
-      window.scrollTo(0, 0);
-      if (messagesContainerRef.current && isNearBottomRef.current) {
-        messagesContainerRef.current.scrollTo({
-          top: messagesContainerRef.current.scrollHeight,
-          behavior: 'smooth'
-        });
-      }
-    }, 100);
+    // When user manually taps input, anchor to latest message if already near bottom
+    if (messagesContainerRef.current && isNearBottomRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: 'auto'
+      });
+    }
   };
 
   const handleSend = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!inputText.trim()) return;
 
     // Immediately stop typing indicator on send
@@ -197,7 +150,19 @@ export default function ChatRoom({
 
     onSendMessage(inputText.trim());
     setInputText('');
-    inputRef.current?.focus({ preventScroll: true });
+
+    // Scroll message container to latest message
+    isNearBottomRef.current = true;
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+
+    // Never call inputRef.current?.focus() here!
+    // If user sent with keyboard open, the input already has focus.
+    // If user dismissed the keyboard, sending must not reopen it!
   };
 
   const handleKeyDown = (e) => {
@@ -214,12 +179,10 @@ export default function ChatRoom({
 
   return (
     <div
-      className="fixed inset-x-0 w-full max-w-full flex flex-col md:static md:flex-row bg-navy-950 text-slate-100 overflow-hidden select-none md:h-screen"
+      className="w-full max-w-full flex flex-col md:flex-row bg-navy-950 text-slate-100 overflow-hidden select-none h-full md:h-screen"
       style={{
-        top: `${viewportMetrics.offsetTop}px`,
-        left: `${viewportMetrics.offsetLeft}px`,
-        height: viewportMetrics.height ? `${viewportMetrics.height}px` : 'var(--app-height, 100dvh)',
-        maxHeight: viewportMetrics.height ? `${viewportMetrics.height}px` : 'var(--app-height, 100dvh)'
+        height: viewportHeight ? `${viewportHeight}px` : '100%',
+        maxHeight: viewportHeight ? `${viewportHeight}px` : '100%'
       }}
     >
       {/* ================= LEFT SIDEBAR (Desktop & Tablet) ================= */}
@@ -317,11 +280,7 @@ export default function ChatRoom({
       {isMobileMembersOpen && (
         <div
           className="fixed inset-0 z-50 flex md:hidden bg-black/60 backdrop-blur-sm"
-          style={{
-            top: `${viewportMetrics.offsetTop}px`,
-            left: `${viewportMetrics.offsetLeft}px`,
-            height: viewportMetrics.height ? `${viewportMetrics.height}px` : '100dvh'
-          }}
+          style={{ height: viewportHeight ? `${viewportHeight}px` : '100%' }}
         >
           <div className="w-[min(20rem,82vw)] bg-navy-900 border-r border-navy-800 h-full p-4 sm:p-5 flex flex-col justify-between shadow-2xl">
             <div className="flex flex-col min-h-0 flex-1">
@@ -547,10 +506,16 @@ export default function ChatRoom({
             <button
               type="submit"
               id="send-message-btn"
-              onMouseDown={(e) => e.preventDefault()}
+              onMouseDown={(e) => {
+                if (document.activeElement === inputRef.current) {
+                  e.preventDefault();
+                }
+              }}
               onTouchStart={(e) => {
-                e.preventDefault();
-                handleSend(e);
+                if (document.activeElement === inputRef.current) {
+                  e.preventDefault();
+                  handleSend(e);
+                }
               }}
               disabled={!inputText.trim()}
               className="bg-cyan-accent hover:bg-cyan-bright disabled:opacity-40 disabled:cursor-not-allowed text-navy-950 p-2 sm:p-2.5 rounded-xl transition flex items-center justify-center flex-shrink-0 shadow-xs active:scale-95"

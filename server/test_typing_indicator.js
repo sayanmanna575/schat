@@ -33,6 +33,7 @@ async function runTypingTests() {
     stdio: 'pipe'
   });
 
+  serverProcess.stdout.on('data', () => {});
   serverProcess.stderr.on('data', (d) => {
     console.error(`[SERVER ERR]: ${d.toString().trim()}`);
   });

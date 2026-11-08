@@ -400,6 +400,41 @@ async function runTest() {
     }
     console.log('  [PASS] Scenario 5: Keyboard close layout restoration verified!\n');
 
+    // --- TEST SCENARIO 5B: Sending Message with Keyboard Closed Does NOT Re-focus/Open Keyboard ---
+    console.log('--- TEST SCENARIO 5B: Send Message with Keyboard Closed (No Re-focus) ---');
+    await evaluate(`
+      (function() {
+        const input = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-message-btn');
+        Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, 'Message sent while closed');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        sendBtn.click();
+      })();
+    `);
+    await new Promise((r) => setTimeout(r, 400));
+
+    let closedSendState = await evaluate(`
+      (function() {
+        const input = document.getElementById('message-input');
+        const bubbles = document.querySelectorAll('.break-words');
+        const lastBubble = bubbles[bubbles.length - 1];
+        return {
+          inputCleared: input ? input.value === '' : false,
+          lastBubbleText: lastBubble ? lastBubble.textContent.trim() : null,
+          isInputFocused: document.activeElement === input
+        };
+      })()
+    `);
+
+    console.log('  Closed send state:', JSON.stringify(closedSendState));
+    console.log('  5B.1 Message sent successfully:', closedSendState.lastBubbleText === 'Message sent while closed');
+    console.log('  5B.2 Input is NOT focused (prevents keyboard reopening):', !closedSendState.isInputFocused);
+    if (closedSendState.isInputFocused) {
+      throw new Error('Input was unexpectedly focused after sending with keyboard closed!');
+    }
+    console.log('  [PASS] Scenario 5B: No automatic focus reopening verified!\n');
+
     // --- TEST SCENARIO 6: Mobile Landscape (Rotation) ---
     console.log('--- TEST SCENARIO 6: Mobile Landscape Orientation (812x375) ---');
     await send('Emulation.setDeviceMetricsOverride', {

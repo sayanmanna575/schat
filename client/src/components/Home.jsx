@@ -11,7 +11,7 @@ export default function Home({ onConnect, isConnecting, error }) {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-navy-950 px-4">
+    <div className="h-full min-h-full w-full flex items-center justify-center bg-navy-950 px-4 overflow-y-auto">
       <div className="w-full max-w-sm flex flex-col items-center">
         {/* Title */}
         <h1 className="text-3xl font-bold tracking-tight text-white mb-8 select-none">
