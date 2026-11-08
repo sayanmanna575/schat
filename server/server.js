@@ -54,7 +54,8 @@ function getOrCreateRoom(roomCode) {
     rooms.set(normalized, {
       code: normalized,
       messages: [],
-      participants: new Map()
+      participants: new Map(),
+      typingSessions: new Map() // sessionId -> Timeout
     });
     console.log(`[Room: ${normalized}] Created new empty room.`);
   }
@@ -98,6 +99,14 @@ function deleteRoom(roomCode) {
   const room = rooms.get(roomCode);
   if (!room) return;
 
+  // Clear any active typing timers
+  if (room.typingSessions) {
+    for (const timer of room.typingSessions.values()) {
+      clearTimeout(timer);
+    }
+    room.typingSessions.clear();
+  }
+
   // Clear any and all pending timers across all participants
   for (const participant of room.participants.values()) {
     if (participant.disconnectTimer) {
@@ -117,6 +126,47 @@ function deleteRoom(roomCode) {
   room.messages = [];
   rooms.delete(roomCode);
   console.log(`[Room: ${roomCode}] Room empty. Permanently deleted room and cleared all messages from memory.`);
+}
+
+function stopTyping(roomCode, sessionId, socket = null) {
+  const room = rooms.get(roomCode);
+  if (!room || !room.typingSessions) return;
+
+  const timer = room.typingSessions.get(sessionId);
+  if (timer) {
+    clearTimeout(timer);
+  }
+  const wasTyping = room.typingSessions.delete(sessionId);
+
+  if (wasTyping) {
+    const isTyping = room.typingSessions.size > 0;
+    if (socket) {
+      socket.to(roomCode).emit('typing_status', { isTyping });
+    } else {
+      io.to(roomCode).emit('typing_status', { isTyping });
+    }
+  }
+}
+
+function startTyping(socket, roomCode, sessionId) {
+  const room = rooms.get(roomCode);
+  if (!room) return;
+  if (!room.typingSessions) room.typingSessions = new Map();
+
+  const existingTimer = room.typingSessions.get(sessionId);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+  }
+
+  // Safety server auto-clear after 3.5s of inactivity
+  const timer = setTimeout(() => {
+    stopTyping(roomCode, sessionId, null);
+  }, 3500);
+
+  room.typingSessions.set(sessionId, timer);
+
+  // Broadcast only to other participants in the same room
+  socket.to(roomCode).emit('typing_status', { isTyping: true });
 }
 
 function deleteRoomIfEmpty(roomCode) {
@@ -178,6 +228,7 @@ function handleExplicitLeave(socket, callback) {
   }
 
   const { roomCode, sessionId } = sessionInfo;
+  stopTyping(roomCode, sessionId, socket);
   socketToSession.delete(socket.id);
   socket.leave(roomCode);
 
@@ -382,6 +433,9 @@ io.on('connection', (socket) => {
 
     room.messages.push(message);
 
+    // Cancel typing status immediately when message is sent
+    stopTyping(roomCode, sessionId, socket);
+
     // Broadcast to everyone in room
     io.to(roomCode).emit('message_received', message);
 
@@ -439,12 +493,28 @@ io.on('connection', (socket) => {
     handleExplicitLeave(socket, callback);
   });
 
+  // Real-time Typing Indicator Events
+  socket.on('typing_start', () => {
+    const sessionInfo = socketToSession.get(socket.id);
+    if (!sessionInfo) return;
+    const { roomCode, sessionId } = sessionInfo;
+    startTyping(socket, roomCode, sessionId);
+  });
+
+  socket.on('typing_stop', () => {
+    const sessionInfo = socketToSession.get(socket.id);
+    if (!sessionInfo) return;
+    const { roomCode, sessionId } = sessionInfo;
+    stopTyping(roomCode, sessionId, socket);
+  });
+
   // Browser Disconnection (Tab close, refresh, network drop)
   socket.on('disconnect', () => {
     const sessionInfo = socketToSession.get(socket.id);
     if (!sessionInfo) return;
 
     const { roomCode, sessionId } = sessionInfo;
+    stopTyping(roomCode, sessionId, null);
     socketToSession.delete(socket.id);
 
     const room = rooms.get(roomCode);

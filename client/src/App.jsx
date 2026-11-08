@@ -16,6 +16,7 @@ export default function App() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState('');
   const [currentSocketId, setCurrentSocketId] = useState('');
+  const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
 
   // Refs for tracking active session in socket callbacks
   const activeSessionRef = useRef({ inRoom: false, sessionId: null, username: '', roomCode: '' });
@@ -95,14 +96,20 @@ export default function App() {
       }
     }
 
+    function onTypingStatus(data) {
+      setIsOtherUserTyping(Boolean(data?.isTyping));
+    }
+
     function onDisconnect(reason) {
       console.log('[Socket Disconnected] Reason:', reason);
+      setIsOtherUserTyping(false);
     }
 
     socket.on('connect', onConnect);
     socket.on('message_received', onMessageReceived);
     socket.on('participants_update', onParticipantsUpdate);
     socket.on('chat_cleared', onChatCleared);
+    socket.on('typing_status', onTypingStatus);
     socket.on('disconnect', onDisconnect);
 
     return () => {
@@ -110,6 +117,7 @@ export default function App() {
       socket.off('message_received', onMessageReceived);
       socket.off('participants_update', onParticipantsUpdate);
       socket.off('chat_cleared', onChatCleared);
+      socket.off('typing_status', onTypingStatus);
       socket.off('disconnect', onDisconnect);
     };
   }, []);
@@ -220,6 +228,8 @@ export default function App() {
   const handleLeaveRoom = useCallback(() => {
     sessionStorage.removeItem(SESSION_STORAGE_KEY);
     localStorage.removeItem(DISCONNECT_STORAGE_KEY);
+    setIsOtherUserTyping(false);
+    socket.emit('typing_stop');
     socket.emit('leave_room', () => {
       setInRoom(false);
       setMessages([]);
@@ -228,6 +238,14 @@ export default function App() {
       setSessionId(null);
       socket.disconnect();
     });
+  }, []);
+
+  const handleTypingStart = useCallback(() => {
+    socket.emit('typing_start');
+  }, []);
+
+  const handleTypingStop = useCallback(() => {
+    socket.emit('typing_stop');
   }, []);
 
   if (inRoom) {
@@ -242,6 +260,9 @@ export default function App() {
         onClearChat={handleClearChat}
         onLeaveRoom={handleLeaveRoom}
         currentSocketId={currentSocketId || socket.id}
+        isOtherUserTyping={isOtherUserTyping}
+        onTypingStart={handleTypingStart}
+        onTypingStop={handleTypingStop}
       />
     );
   }

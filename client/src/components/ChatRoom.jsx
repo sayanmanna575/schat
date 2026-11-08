@@ -20,13 +20,17 @@ export default function ChatRoom({
   onSendMessage,
   onClearChat,
   onLeaveRoom,
-  currentSocketId
+  currentSocketId,
+  isOtherUserTyping,
+  onTypingStart,
+  onTypingStop
 }) {
   const [inputText, setInputText] = useState('');
   const [isMobileMembersOpen, setIsMobileMembersOpen] = useState(false);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   const onlineCount = participants.filter((p) => p.status !== 'disconnected').length;
 
@@ -38,11 +42,53 @@ export default function ChatRoom({
         behavior: 'smooth'
       });
     }
-  }, [messages]);
+  }, [messages, isOtherUserTyping]);
+
+  // Clean up typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      if (onTypingStop) onTypingStop();
+    };
+  }, [onTypingStop]);
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setInputText(val);
+
+    if (val.trim()) {
+      if (onTypingStart) onTypingStart();
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      // Hide indicator after 2 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        if (onTypingStop) onTypingStop();
+      }, 2000);
+    } else {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (onTypingStop) onTypingStop();
+    }
+  };
 
   const handleSend = (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
+
+    // Immediately stop typing indicator on send
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    if (onTypingStop) onTypingStop();
+
     onSendMessage(inputText.trim());
     setInputText('');
     inputRef.current?.focus();
@@ -282,7 +328,7 @@ export default function ChatRoom({
           ref={messagesContainerRef}
           className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-2.5 sm:space-y-3 min-h-0 w-full overscroll-contain"
         >
-          {messages.length === 0 ? (
+          {messages.length === 0 && !isOtherUserTyping ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs text-center select-none py-8">
               <MessageSquare size={24} className="mb-2 text-slate-600 opacity-60" />
               <span>No messages yet in this room</span>
@@ -341,6 +387,21 @@ export default function ChatRoom({
               );
             })
           )}
+
+          {/* Minimal Real-Time Typing Indicator [...] */}
+          {isOtherUserTyping && (
+            <div
+              id="typing-indicator"
+              className="flex flex-col items-start select-none transition-all duration-200"
+              aria-label="Another participant is typing"
+            >
+              <div className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl rounded-tl-xs bg-navy-850 text-slate-100 border border-navy-750 shadow-xs">
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Message Input Bottom Area */}
@@ -354,7 +415,7 @@ export default function ChatRoom({
               type="text"
               id="message-input"
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               autoComplete="off"
