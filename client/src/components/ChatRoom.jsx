@@ -28,11 +28,19 @@ export default function ChatRoom({
   const [inputText, setInputText] = useState('');
   const [isMobileMembersOpen, setIsMobileMembersOpen] = useState(false);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
-  const [viewportHeight, setViewportHeight] = useState(() => {
+  const [viewportMetrics, setViewportMetrics] = useState(() => {
     if (typeof window !== 'undefined' && window.visualViewport) {
-      return Math.round(window.visualViewport.height);
+      return {
+        height: Math.round(window.visualViewport.height),
+        offsetTop: Math.round(window.visualViewport.offsetTop || 0),
+        offsetLeft: Math.round(window.visualViewport.offsetLeft || 0)
+      };
     }
-    return typeof window !== 'undefined' ? window.innerHeight : null;
+    return {
+      height: typeof window !== 'undefined' ? window.innerHeight : null,
+      offsetTop: 0,
+      offsetLeft: 0
+    };
   });
 
   const messagesContainerRef = useRef(null);
@@ -65,9 +73,19 @@ export default function ChatRoom({
         document.documentElement.scrollTop = 0;
       }
 
-      const currentHeight = vv ? Math.round(vv.height) : window.innerHeight;
-      setViewportHeight(currentHeight);
-      document.documentElement.style.setProperty('--app-height', `${currentHeight}px`);
+      if (vv) {
+        const height = Math.round(vv.height);
+        const offsetTop = Math.round(vv.offsetTop || 0);
+        const offsetLeft = Math.round(vv.offsetLeft || 0);
+        setViewportMetrics({ height, offsetTop, offsetLeft });
+        document.documentElement.style.setProperty('--app-height', `${height}px`);
+        document.documentElement.style.setProperty('--app-offset-top', `${offsetTop}px`);
+      } else {
+        const height = window.innerHeight;
+        setViewportMetrics({ height, offsetTop: 0, offsetLeft: 0 });
+        document.documentElement.style.setProperty('--app-height', `${height}px`);
+        document.documentElement.style.setProperty('--app-offset-top', '0px');
+      }
     };
 
     if (vv) {
@@ -99,7 +117,7 @@ export default function ChatRoom({
         behavior: 'auto'
       });
     }
-  }, [viewportHeight]);
+  }, [viewportMetrics.height]);
 
   // Auto-scroll inside messages container when new message arrives or typing changes
   useEffect(() => {
@@ -150,6 +168,10 @@ export default function ChatRoom({
     document.body.scrollTop = 0;
     document.documentElement.scrollTop = 0;
 
+    requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+    });
+
     // Anchor messages to bottom when keyboard opens
     setTimeout(() => {
       window.scrollTo(0, 0);
@@ -175,7 +197,7 @@ export default function ChatRoom({
 
     onSendMessage(inputText.trim());
     setInputText('');
-    inputRef.current?.focus();
+    inputRef.current?.focus({ preventScroll: true });
   };
 
   const handleKeyDown = (e) => {
@@ -192,10 +214,12 @@ export default function ChatRoom({
 
   return (
     <div
-      className="w-full max-w-full flex flex-col md:flex-row bg-navy-950 text-slate-100 overflow-hidden select-none md:h-screen"
+      className="fixed inset-x-0 w-full max-w-full flex flex-col md:static md:flex-row bg-navy-950 text-slate-100 overflow-hidden select-none md:h-screen"
       style={{
-        height: viewportHeight ? `${viewportHeight}px` : 'var(--app-height, 100dvh)',
-        maxHeight: viewportHeight ? `${viewportHeight}px` : 'var(--app-height, 100dvh)'
+        top: `${viewportMetrics.offsetTop}px`,
+        left: `${viewportMetrics.offsetLeft}px`,
+        height: viewportMetrics.height ? `${viewportMetrics.height}px` : 'var(--app-height, 100dvh)',
+        maxHeight: viewportMetrics.height ? `${viewportMetrics.height}px` : 'var(--app-height, 100dvh)'
       }}
     >
       {/* ================= LEFT SIDEBAR (Desktop & Tablet) ================= */}
@@ -293,7 +317,11 @@ export default function ChatRoom({
       {isMobileMembersOpen && (
         <div
           className="fixed inset-0 z-50 flex md:hidden bg-black/60 backdrop-blur-sm"
-          style={{ height: viewportHeight ? `${viewportHeight}px` : '100dvh' }}
+          style={{
+            top: `${viewportMetrics.offsetTop}px`,
+            left: `${viewportMetrics.offsetLeft}px`,
+            height: viewportMetrics.height ? `${viewportMetrics.height}px` : '100dvh'
+          }}
         >
           <div className="w-[min(20rem,82vw)] bg-navy-900 border-r border-navy-800 h-full p-4 sm:p-5 flex flex-col justify-between shadow-2xl">
             <div className="flex flex-col min-h-0 flex-1">
@@ -514,12 +542,16 @@ export default function ChatRoom({
               onFocus={handleInputFocus}
               placeholder="Type a message..."
               autoComplete="off"
-              className="flex-1 min-w-0 bg-navy-900 text-slate-100 placeholder-slate-500 text-xs sm:text-sm px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-navy-700 focus:border-cyan-accent focus:outline-none focus:ring-1 focus:ring-cyan-accent/30 transition select-text"
+              className="flex-1 min-w-0 bg-navy-900 text-slate-100 placeholder-slate-500 text-[16px] sm:text-sm px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-navy-700 focus:border-cyan-accent focus:outline-none focus:ring-1 focus:ring-cyan-accent/30 transition select-text"
             />
             <button
               type="submit"
               id="send-message-btn"
               onMouseDown={(e) => e.preventDefault()}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                handleSend(e);
+              }}
               disabled={!inputText.trim()}
               className="bg-cyan-accent hover:bg-cyan-bright disabled:opacity-40 disabled:cursor-not-allowed text-navy-950 p-2 sm:p-2.5 rounded-xl transition flex items-center justify-center flex-shrink-0 shadow-xs active:scale-95"
               title="Send message"

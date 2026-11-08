@@ -49,6 +49,13 @@ input, button, textarea {
   font-family: inherit;
 }
 
+/* Prevent mobile browsers (Chrome Android / iOS Safari) from auto-zooming and panning on input focus */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* Minimal Real-Time Typing Indicator [...] */
 @keyframes typingPulse {
   0%, 60%, 100% {
