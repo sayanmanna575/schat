@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node test_reconnection_persistence.js"
+    "test": "node test_reconnection_persistence.js",
+    "test:viewports": "node test_responsive_viewports.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

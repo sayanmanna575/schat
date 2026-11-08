@@ -25,14 +25,19 @@ export default function ChatRoom({
   const [inputText, setInputText] = useState('');
   const [isMobileMembersOpen, setIsMobileMembersOpen] = useState(false);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
-  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
 
   const onlineCount = participants.filter((p) => p.status !== 'disconnected').length;
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll inside messages container without triggering parent/window scrolls
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
   }, [messages]);
 
   const handleSend = (e) => {
@@ -56,19 +61,19 @@ export default function ChatRoom({
   };
 
   return (
-    <div className="h-screen w-screen flex bg-navy-950 text-slate-100 overflow-hidden select-none">
-      {/* ================= LEFT SIDEBAR (Desktop) ================= */}
-      <aside className="hidden md:flex flex-col w-64 lg:w-72 bg-navy-900 border-r border-navy-800 p-5 flex-shrink-0 justify-between">
-        <div className="flex flex-col min-h-0">
+    <div className="h-[100dvh] min-h-[100dvh] max-h-[100dvh] w-full max-w-full flex flex-col md:flex-row bg-navy-950 text-slate-100 overflow-hidden select-none">
+      {/* ================= LEFT SIDEBAR (Desktop & Tablet) ================= */}
+      <aside className="hidden md:flex flex-col w-[clamp(14rem,22vw,18rem)] bg-navy-900 border-r border-navy-800 p-4 lg:p-5 flex-shrink-0 justify-between min-h-0 h-full overflow-hidden">
+        <div className="flex flex-col min-h-0 flex-1">
           {/* Logo */}
-          <div className="flex items-center justify-between pb-4 border-b border-navy-800">
+          <div className="flex items-center justify-between pb-3 lg:pb-4 border-b border-navy-800 flex-shrink-0">
             <h1 className="text-xl font-bold tracking-tight text-white">
               SChat<span className="text-cyan-accent">.</span>
             </h1>
           </div>
 
           {/* Room Info */}
-          <div className="py-4 border-b border-navy-800">
+          <div className="py-3 lg:py-4 border-b border-navy-800 flex-shrink-0">
             <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
               Room Code
             </div>
@@ -76,21 +81,21 @@ export default function ChatRoom({
               {roomCode}
             </div>
 
-            <div className="mt-3 flex items-center gap-2 text-xs text-slate-300">
-              <span className="relative flex h-2 w-2">
+            <div className="mt-2.5 flex items-center gap-2 text-xs text-slate-300">
+              <span className="relative flex h-2 w-2 flex-shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-accent opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-accent"></span>
               </span>
-              <span>{onlineCount} {onlineCount === 1 ? 'participant' : 'participants'} online</span>
+              <span className="truncate">{onlineCount} {onlineCount === 1 ? 'participant' : 'participants'} online</span>
             </div>
           </div>
 
           {/* Connected Members List */}
-          <div className="flex-1 py-4 flex flex-col min-h-0">
-            <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-2">
+          <div className="flex-1 py-3 lg:py-4 flex flex-col min-h-0 overflow-hidden">
+            <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-2 flex-shrink-0">
               Participants ({participants.length})
             </div>
-            <div className="overflow-y-auto space-y-1.5 pr-1 flex-1">
+            <div className="overflow-y-auto space-y-1.5 pr-1 flex-1 min-h-0">
               {participants.map((p) => {
                 const isMe = (sessionId && p.sessionId === sessionId) || p.id === currentSocketId;
                 const isDisconnected = p.status === 'disconnected';
@@ -104,7 +109,7 @@ export default function ChatRoom({
                         : 'text-slate-300 hover:bg-navy-800/40'
                     }`}
                   >
-                    <span className="truncate flex items-center gap-2">
+                    <span className="truncate flex items-center gap-2 min-w-0 mr-1.5">
                       <span
                         className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                           isDisconnected ? 'bg-amber-400 animate-pulse' : 'bg-cyan-accent'
@@ -135,7 +140,7 @@ export default function ChatRoom({
         </div>
 
         {/* Leave Room Button */}
-        <div className="pt-4 border-t border-navy-800">
+        <div className="pt-3 lg:pt-4 border-t border-navy-800 flex-shrink-0">
           <button
             type="button"
             onClick={onLeaveRoom}
@@ -150,23 +155,24 @@ export default function ChatRoom({
 
       {/* ================= MOBILE MEMBERS DRAWER ================= */}
       {isMobileMembersOpen && (
-        <div className="fixed inset-0 z-40 flex md:hidden bg-black/60 backdrop-blur-xs">
-          <div className="w-64 max-w-[80%] bg-navy-900 border-r border-navy-800 h-full p-4 flex flex-col justify-between">
-            <div className="flex flex-col min-h-0">
-              <div className="flex items-center justify-between pb-3 border-b border-navy-800">
+        <div className="fixed inset-0 z-50 flex md:hidden bg-black/60 backdrop-blur-sm">
+          <div className="w-[min(20rem,82vw)] bg-navy-900 border-r border-navy-800 h-full p-4 sm:p-5 flex flex-col justify-between shadow-2xl">
+            <div className="flex flex-col min-h-0 flex-1">
+              <div className="flex items-center justify-between pb-3 border-b border-navy-800 flex-shrink-0">
                 <h2 className="text-base font-bold text-white">
                   SChat<span className="text-cyan-accent">.</span>
                 </h2>
                 <button
                   type="button"
                   onClick={() => setIsMobileMembersOpen(false)}
-                  className="p-1 rounded text-slate-400 hover:text-white"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-navy-800 transition"
+                  aria-label="Close participants list"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              <div className="py-3 border-b border-navy-800">
+              <div className="py-3 border-b border-navy-800 flex-shrink-0">
                 <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-0.5">
                   Room Code
                 </div>
@@ -174,13 +180,13 @@ export default function ChatRoom({
                   {roomCode}
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-xs text-slate-300">
-                  <span className="h-2 w-2 rounded-full bg-cyan-accent"></span>
-                  <span>{onlineCount} online</span>
+                  <span className="h-2 w-2 rounded-full bg-cyan-accent flex-shrink-0"></span>
+                  <span>{onlineCount} {onlineCount === 1 ? 'participant' : 'participants'} online</span>
                 </div>
               </div>
 
-              <div className="flex-1 py-3 overflow-y-auto space-y-1">
-                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-2">
+              <div className="flex-1 py-3 overflow-y-auto space-y-1 min-h-0">
+                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-2 flex-shrink-0">
                   Members ({participants.length})
                 </div>
                 {participants.map((p) => {
@@ -194,17 +200,17 @@ export default function ChatRoom({
                         isMe ? 'bg-navy-800 text-white' : 'text-slate-300'
                       }`}
                     >
-                      <span className="truncate flex items-center gap-1.5">
+                      <span className="truncate flex items-center gap-1.5 min-w-0 mr-1.5">
                         <span
-                          className={`w-1.5 h-1.5 rounded-full ${
+                          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                             isDisconnected ? 'bg-amber-400' : 'bg-cyan-accent'
                           }`}
                         />
-                        <span className={isDisconnected ? 'italic text-slate-400' : ''}>
+                        <span className={`truncate ${isDisconnected ? 'italic text-slate-400' : ''}`}>
                           {p.username}
                         </span>
                       </span>
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1 flex-shrink-0">
                         {isDisconnected && <span className="text-[9px] text-amber-400">reconnecting</span>}
                         {isMe && <span className="text-[10px] text-cyan-accent">You</span>}
                       </span>
@@ -217,7 +223,7 @@ export default function ChatRoom({
             <button
               type="button"
               onClick={onLeaveRoom}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-rose-400 bg-navy-800 border border-navy-700"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium text-rose-400 bg-navy-800 hover:bg-navy-750 border border-navy-700 transition flex-shrink-0 mt-3"
             >
               <LogOut size={14} />
               <span>Leave Room</span>
@@ -229,29 +235,30 @@ export default function ChatRoom({
       )}
 
       {/* ================= MAIN CHAT AREA ================= */}
-      <main className="flex-1 flex flex-col h-full bg-navy-950 min-w-0">
+      <main className="flex-1 flex flex-col h-full min-h-0 min-w-0 bg-navy-950 overflow-hidden">
         {/* Chat Header */}
-        <header className="h-14 px-4 md:px-6 border-b border-navy-800 bg-navy-900/70 backdrop-blur-xs flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="min-h-[3.25rem] py-2.5 px-3 sm:px-4 md:px-6 border-b border-navy-800 bg-navy-900/80 backdrop-blur-sm flex items-center justify-between flex-shrink-0 gap-2 w-full z-10">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             {/* Mobile toggle button */}
             <button
               type="button"
               id="mobile-members-toggle"
               onClick={() => setIsMobileMembersOpen(true)}
-              className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white bg-navy-800 border border-navy-700 flex items-center gap-1.5 text-xs"
+              className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white bg-navy-800 hover:bg-navy-750 border border-navy-700 flex items-center gap-1.5 text-xs flex-shrink-0 transition active:scale-95"
               title="View participants"
+              aria-label="View participants"
             >
               <Users size={15} />
-              <span className="text-[11px]">{onlineCount}</span>
+              <span className="text-[11px] font-medium">{onlineCount}</span>
             </button>
 
             <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-white truncate">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs sm:text-sm font-semibold text-white truncate max-w-[140px] sm:max-w-[220px] md:max-w-none">
                   {roomCode}
                 </span>
-                <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-cyan-accent"></span>
-                <span className="hidden sm:inline-block text-xs text-slate-400 font-normal">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-accent flex-shrink-0"></span>
+                <span className="text-[11px] sm:text-xs text-slate-400 font-normal truncate">
                   {onlineCount} online
                 </span>
               </div>
@@ -263,17 +270,20 @@ export default function ChatRoom({
             type="button"
             id="clear-chat-btn"
             onClick={() => setIsClearModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium uppercase tracking-wider text-slate-400 hover:text-rose-400 bg-navy-800/80 hover:bg-navy-800 border border-navy-700 hover:border-rose-500/30 transition active:scale-95"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium uppercase tracking-wider text-slate-400 hover:text-rose-400 bg-navy-800/80 hover:bg-navy-800 border border-navy-700 hover:border-rose-500/30 transition active:scale-95 flex-shrink-0"
           >
             <Trash2 size={13} />
-            <span>Clear Chat</span>
+            <span>Clear<span className="hidden sm:inline"> Chat</span></span>
           </button>
         </header>
 
         {/* Messages Scroll Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 min-h-0">
+        <div
+          ref={messagesContainerRef}
+          className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-2.5 sm:space-y-3 min-h-0 w-full overscroll-contain"
+        >
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs text-center select-none">
+            <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs text-center select-none py-8">
               <MessageSquare size={24} className="mb-2 text-slate-600 opacity-60" />
               <span>No messages yet in this room</span>
             </div>
@@ -284,11 +294,11 @@ export default function ChatRoom({
                 return (
                   <div
                     key={msg.id}
-                    className="flex items-center justify-center my-3 select-none"
+                    className="flex items-center justify-center my-2 sm:my-3 select-none"
                   >
-                    <div className="text-[11px] text-slate-400 bg-navy-900/90 border border-navy-800 px-3 py-1 rounded-full flex items-center gap-2">
-                      <span>{msg.text}</span>
-                      <span className="text-[9px] text-slate-500">
+                    <div className="text-[10px] sm:text-[11px] text-slate-400 bg-navy-900/90 border border-navy-800 px-3 py-1 rounded-full flex items-center gap-2 max-w-[90%] text-center">
+                      <span className="truncate">{msg.text}</span>
+                      <span className="text-[9px] text-slate-500 flex-shrink-0">
                         {formatTimestamp(msg.timestamp)}
                       </span>
                     </div>
@@ -319,7 +329,7 @@ export default function ChatRoom({
 
                   {/* Message Bubble */}
                   <div
-                    className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed max-w-[85%] md:max-w-[70%] break-words select-text ${
+                    className={`px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl text-xs sm:text-sm leading-relaxed max-w-[88%] sm:max-w-[80%] md:max-w-[70%] break-words select-text ${
                       isMe
                         ? 'bg-cyan-600 text-white rounded-tr-xs shadow-xs'
                         : 'bg-navy-850 text-slate-100 rounded-tl-xs border border-navy-750 shadow-xs'
@@ -331,14 +341,13 @@ export default function ChatRoom({
               );
             })
           )}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Message Input Bottom Area */}
-        <div className="p-3 md:p-4 border-t border-navy-800 bg-navy-900/60 flex-shrink-0">
+        <div className="p-2.5 sm:p-3 md:p-4 pb-[max(0.625rem,env(safe-area-inset-bottom))] border-t border-navy-800 bg-navy-900/60 flex-shrink-0 w-full">
           <form
             onSubmit={handleSend}
-            className="flex items-center gap-2 max-w-4xl mx-auto"
+            className="flex items-center gap-2 max-w-4xl mx-auto w-full"
           >
             <input
               ref={inputRef}
@@ -349,16 +358,16 @@ export default function ChatRoom({
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               autoComplete="off"
-              className="flex-1 bg-navy-900 text-slate-100 placeholder-slate-500 text-sm px-4 py-2.5 rounded-xl border border-navy-700 focus:border-cyan-accent focus:outline-none focus:ring-1 focus:ring-cyan-accent/30 transition select-text"
+              className="flex-1 min-w-0 bg-navy-900 text-slate-100 placeholder-slate-500 text-xs sm:text-sm px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-navy-700 focus:border-cyan-accent focus:outline-none focus:ring-1 focus:ring-cyan-accent/30 transition select-text"
             />
             <button
               type="submit"
               id="send-message-btn"
               disabled={!inputText.trim()}
-              className="bg-cyan-accent hover:bg-cyan-bright disabled:opacity-40 disabled:cursor-not-allowed text-navy-950 p-2.5 rounded-xl transition flex items-center justify-center flex-shrink-0 shadow-xs active:scale-95"
+              className="bg-cyan-accent hover:bg-cyan-bright disabled:opacity-40 disabled:cursor-not-allowed text-navy-950 p-2 sm:p-2.5 rounded-xl transition flex items-center justify-center flex-shrink-0 shadow-xs active:scale-95"
               title="Send message"
             >
-              <Send size={18} />
+              <Send size={16} className="sm:w-[18px] sm:h-[18px]" />
             </button>
           </form>
         </div>

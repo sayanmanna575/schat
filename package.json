@@ -9,6 +9,7 @@
     "install:all": "npm install && cd server && npm install && cd ../client && npm install",
     "build:client": "cd client && npm run build",
     "test": "cd server && npm test",
+    "test:viewports": "cd server && npm run test:viewports",
     "start": "cd server && npm start"
   },
   "devDependencies": {
