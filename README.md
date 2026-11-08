@@ -161,4 +161,4 @@ If you prefer using Railway instead of Render:
 
 * **Render Free Tier Spin-down**: On Render's free tier, the backend sleeps after 15 minutes of inactivity. The first connection after a pause may take 30–50 seconds to wake up.
 * **WebSocket Fallback**: The client is configured with `transports: ['websocket', 'polling']`. If WebSocket connections are restricted on certain networks or proxies, it will smoothly fall back to HTTP long-polling.
-* **In-Memory Retention**: Rooms and message histories exist strictly in server memory. When the last participant leaves a room, a 15-second grace period is triggered. If nobody rejoins within 15 seconds, the room and all messages are permanently wiped.
+* **In-Memory Retention**: Rooms and message histories exist strictly in server memory. When the last participant leaves a room, a 5-second grace period is triggered. If nobody rejoins within 5 seconds, the room and all messages are permanently wiped.

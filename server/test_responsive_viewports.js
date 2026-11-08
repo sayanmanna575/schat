@@ -303,3 +303,4 @@ runResponsiveTests().catch((err) => {
   console.error('\n[FAIL] Responsive viewport test failed:', err);
   process.exit(1);
 });
+

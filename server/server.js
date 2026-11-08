@@ -9,7 +9,7 @@ const server = http.createServer(app);
 
 const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || '*';
-const RECONNECTION_GRACE_PERIOD_MS = parseInt(process.env.RECONNECTION_GRACE_PERIOD_MS, 10) || 20000; // 20 seconds grace period
+const RECONNECTION_GRACE_PERIOD_MS = parseInt(process.env.RECONNECTION_GRACE_PERIOD_MS, 10) || 5000; // 5 seconds grace period
 
 app.use(cors());
 app.use(express.json());
@@ -235,17 +235,17 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Case 1: Reconnecting an existing session within the 20s grace period
+    // Case 1: Reconnecting an existing session within the 5s grace period
     if (sessionId) {
       const existingRoom = rooms.get(cleanRoomCode);
       if (existingRoom && existingRoom.participants.has(sessionId)) {
         const existingParticipant = existingRoom.participants.get(sessionId);
 
-        // Cancel the pending 20s disconnection timer immediately!
+        // Cancel the pending 5s disconnection timer immediately!
         if (existingParticipant.disconnectTimer) {
           clearTimeout(existingParticipant.disconnectTimer);
           existingParticipant.disconnectTimer = null;
-          console.log(`[Room: ${cleanRoomCode}] Canceled 20s disconnect timer for ${existingParticipant.username} (${sessionId})`);
+          console.log(`[Room: ${cleanRoomCode}] Canceled 5s disconnect timer for ${existingParticipant.username} (${sessionId})`);
         }
 
         // If old socket existed in mapping, clean it up
@@ -470,7 +470,7 @@ io.on('connection', (socket) => {
     // Broadcast updated online count (they are temporarily offline)
     broadcastParticipantsUpdate(roomCode);
 
-    // Start 20-second reconnection timer
+    // Start 5-second reconnection timer
     if (participant.disconnectTimer) {
       clearTimeout(participant.disconnectTimer);
     }

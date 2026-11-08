@@ -24,7 +24,7 @@ export default function App() {
     activeSessionRef.current = { inRoom, sessionId, username, roomCode };
   }, [inRoom, sessionId, username, roomCode]);
 
-  // Track page unload to support browser/tab close reconnection within 20s grace period
+  // Track page unload to support browser/tab close reconnection within 5s grace period
   useEffect(() => {
     const handleBeforeUnload = () => {
       const { inRoom: currentInRoom, sessionId: currentSession, username: currentUser, roomCode: currentRoom } = activeSessionRef.current;
@@ -185,14 +185,14 @@ export default function App() {
       sessionStorage.removeItem(SESSION_STORAGE_KEY);
     }
 
-    // 2. If not found, check localStorage for recently closed tab/browser within 20s grace period
+    // 2. If not found, check localStorage for recently closed tab/browser within 5s grace period
     if (!sessionToRestore) {
       try {
         const storedDisconnect = localStorage.getItem(DISCONNECT_STORAGE_KEY);
         if (storedDisconnect) {
           const parsed = JSON.parse(storedDisconnect);
           const elapsed = Date.now() - (parsed.disconnectedAt || 0);
-          if (elapsed < 20000 && parsed.sessionId && parsed.username && parsed.roomCode) {
+          if (elapsed < 5000 && parsed.sessionId && parsed.username && parsed.roomCode) {
             sessionToRestore = parsed;
           } else {
             localStorage.removeItem(DISCONNECT_STORAGE_KEY);
