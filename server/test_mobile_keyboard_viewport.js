@@ -319,16 +319,17 @@ async function runTest() {
     }
     console.log('  [PASS] Scenario 3: Isolated message scrolling verified!\n');
 
-    // --- TEST SCENARIO 4: Send a Message while Keyboard is Open ---
-    console.log('--- TEST SCENARIO 4: Sending Message (Keyboard Remains Open) ---');
+    // --- TEST SCENARIO 4: Send a Message via Send Button while Keyboard is Open ---
+    console.log('--- TEST SCENARIO 4: Sending Message via Send Button (Keyboard Remains Open) ---');
     await evaluate(`
       (function() {
         const input = document.getElementById('message-input');
-        const form = input.closest('form');
+        const sendBtn = document.getElementById('send-message-btn');
+        input.focus();
         Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, 'Keyboard test message');
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
-        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        sendBtn.click();
       })();
     `);
     await new Promise((r) => setTimeout(r, 400));
@@ -350,10 +351,56 @@ async function runTest() {
     console.log('  4.1 Input cleared after send:', sendState.inputCleared);
     console.log('  4.2 Message sent successfully:', sendState.lastBubbleText === 'Keyboard test message');
     console.log('  4.3 Input maintains focus (keeps keyboard open):', sendState.isInputFocused);
-    if (!sendState.inputCleared || sendState.lastBubbleText !== 'Keyboard test message') {
-      throw new Error('Message sending failed while keyboard was open');
+    if (!sendState.inputCleared || sendState.lastBubbleText !== 'Keyboard test message' || !sendState.isInputFocused) {
+      throw new Error('Message sending via button failed or keyboard focus was lost!');
     }
     console.log('  [PASS] Scenario 4: Send message with keyboard open verified!\n');
+
+    // --- TEST SCENARIO 4B: Type Immediately & Send via Enter Key (Keyboard Remains Open) ---
+    console.log('--- TEST SCENARIO 4B: Continuous Typing & Send via Enter Key ---');
+    await evaluate(`
+      (function() {
+        const input = document.getElementById('message-input');
+        Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, 'Second message immediately');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      })();
+    `);
+    await send('Input.dispatchKeyEvent', {
+      type: 'keyDown',
+      key: 'Enter',
+      code: 'Enter',
+      windowsVirtualKeyCode: 13
+    });
+    await send('Input.dispatchKeyEvent', {
+      type: 'keyUp',
+      key: 'Enter',
+      code: 'Enter',
+      windowsVirtualKeyCode: 13
+    });
+    await new Promise((r) => setTimeout(r, 400));
+
+    let enterSendState = await evaluate(`
+      (function() {
+        const input = document.getElementById('message-input');
+        const bubbles = document.querySelectorAll('.break-words');
+        const lastBubble = bubbles[bubbles.length - 1];
+        return {
+          inputCleared: input ? input.value === '' : false,
+          lastBubbleText: lastBubble ? lastBubble.textContent.trim() : null,
+          isInputFocused: document.activeElement === input
+        };
+      })()
+    `);
+
+    console.log('  Enter send state:', JSON.stringify(enterSendState));
+    console.log('  4B.1 Second message sent successfully:', enterSendState.lastBubbleText === 'Second message immediately');
+    console.log('  4B.2 Input cleared:', enterSendState.inputCleared);
+    console.log('  4B.3 Input maintains focus (keeps keyboard open):', enterSendState.isInputFocused);
+    if (!enterSendState.inputCleared || enterSendState.lastBubbleText !== 'Second message immediately' || !enterSendState.isInputFocused) {
+      throw new Error('Enter key send failed or lost focus!');
+    }
+    console.log('  [PASS] Scenario 4B: Continuous messaging verified!\n');
 
     // --- TEST SCENARIO 5: Close Keyboard (Viewport restores to 812px) ---
     console.log('--- TEST SCENARIO 5: Close Keyboard (Full Viewport Restored) ---');

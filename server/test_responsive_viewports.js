@@ -129,7 +129,13 @@ async function runResponsiveTests() {
       });
 
       await send('Page.navigate', { url: `http://localhost:${TEST_PORT}/` });
-      await new Promise((r) => setTimeout(r, 600));
+      
+      // Wait for home screen input
+      for (let i = 0; i < 30; i++) {
+        const r = await send('Runtime.evaluate', { expression: 'Boolean(document.getElementById("username-input"))' });
+        if (r.result && r.result.value) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
 
       // Fill in username and room code on home screen
       await send('Runtime.evaluate', {
@@ -152,7 +158,12 @@ async function runResponsiveTests() {
         `
       });
 
-      await new Promise((r) => setTimeout(r, 1000));
+      // Wait for ChatRoom header
+      for (let i = 0; i < 30; i++) {
+        const r = await send('Runtime.evaluate', { expression: 'Boolean(document.querySelector("header"))' });
+        if (r.result && r.result.value) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
 
       // Evaluate ChatRoom layout
       const layoutRes = await send('Runtime.evaluate', {

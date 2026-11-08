@@ -10,6 +10,11 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function waitForConnect(client) {
+  if (client.connected) return Promise.resolve();
+  return new Promise((resolve) => client.once('connect', resolve));
+}
+
 function createClient() {
   return io(SERVER_URL, {
     forceNew: true,
@@ -53,7 +58,7 @@ async function runSuite() {
     let client1AMessages = [];
     client1A.on('message_received', (m) => client1AMessages.push(m));
 
-    await new Promise((resolve) => client1A.on('connect', resolve));
+    await waitForConnect(client1A);
     const join1ARes = await new Promise((resolve) => {
       client1A.emit('join_room', { username: 'Alice', roomCode: 'ROOM_RECONNECT' }, resolve);
     });
@@ -75,7 +80,7 @@ async function runSuite() {
 
     // Alice reconnects with new socket using existing sessionId
     const client1AReconnected = createClient();
-    await new Promise((resolve) => client1AReconnected.on('connect', resolve));
+    await waitForConnect(client1AReconnected);
 
     let reconnectedMessages = [];
     client1AReconnected.on('message_received', (m) => reconnectedMessages.push(m));
@@ -137,8 +142,8 @@ async function runSuite() {
     let charlieMessages = [];
     let charlieParticipants = [];
 
-    await new Promise((resolve) => client2Bob.on('connect', resolve));
-    await new Promise((resolve) => client2Charlie.on('connect', resolve));
+    await waitForConnect(client2Bob);
+    await waitForConnect(client2Charlie);
 
     client2Charlie.on('message_received', (m) => charlieMessages.push(m));
     client2Charlie.on('participants_update', (d) => (charlieParticipants = d.participants));
@@ -174,7 +179,7 @@ async function runSuite() {
 
     // Verify expired session cannot reconnect
     const client2BobTryReconnect = createClient();
-    await new Promise((resolve) => client2BobTryReconnect.on('connect', resolve));
+    await waitForConnect(client2BobTryReconnect);
     const expiredReconnectRes = await new Promise((resolve) => {
       client2BobTryReconnect.emit(
         'join_room',
@@ -203,7 +208,7 @@ async function runSuite() {
 
     // Another person (Dave) joins ROOM_EXPIRY
     const client3Dave = createClient();
-    await new Promise((resolve) => client3Dave.on('connect', resolve));
+    await waitForConnect(client3Dave);
 
     const daveJoinRes = await new Promise((resolve) => {
       client3Dave.emit('join_room', { username: 'Dave', roomCode: 'ROOM_EXPIRY' }, resolve);
@@ -229,7 +234,7 @@ async function runSuite() {
     // -------------------------------------------------------------------
     console.log('--- TEST 4: Room Deletion and Cleanup When Last Participant Leaves ---');
     const client4Solo = createClient();
-    await new Promise((resolve) => client4Solo.on('connect', resolve));
+    await waitForConnect(client4Solo);
 
     await new Promise((resolve) => {
       client4Solo.emit('join_room', { username: 'Solo', roomCode: 'ROOM_CLEANUP' }, resolve);
@@ -247,7 +252,7 @@ async function runSuite() {
     // Room should now be completely deleted.
     // Someone connects to ROOM_CLEANUP anew.
     const client4New = createClient();
-    await new Promise((resolve) => client4New.on('connect', resolve));
+    await waitForConnect(client4New);
     const newJoinRes = await new Promise((resolve) => {
       client4New.emit('join_room', { username: 'Stranger', roomCode: 'ROOM_CLEANUP' }, resolve);
     });
@@ -270,8 +275,8 @@ async function runSuite() {
     const client5A = createClient();
     const client5B = createClient();
     let client5BMessages = [];
-    await new Promise((resolve) => client5A.on('connect', resolve));
-    await new Promise((resolve) => client5B.on('connect', resolve));
+    await waitForConnect(client5A);
+    await waitForConnect(client5B);
     client5B.on('message_received', (m) => client5BMessages.push(m));
 
     await new Promise((resolve) => {
@@ -305,8 +310,8 @@ async function runSuite() {
     const client6Clone1 = createClient();
     const client6Clone2 = createClient();
 
-    await new Promise((resolve) => client6Clone1.on('connect', resolve));
-    await new Promise((resolve) => client6Clone2.on('connect', resolve));
+    await waitForConnect(client6Clone1);
+    await waitForConnect(client6Clone2);
 
     let clone2Participants = [];
     client6Clone2.on('participants_update', (d) => (clone2Participants = d.participants));
@@ -347,7 +352,7 @@ async function runSuite() {
 
     // Clone 1 reconnects
     const client6Clone1Reconnected = createClient();
-    await new Promise((resolve) => client6Clone1Reconnected.on('connect', resolve));
+    await waitForConnect(client6Clone1Reconnected);
     const clone1ReconnectRes = await new Promise((resolve) => {
       client6Clone1Reconnected.emit(
         'join_room',
@@ -375,7 +380,7 @@ async function runSuite() {
     // -------------------------------------------------------------------
     console.log('--- TEST 7: Fast Reconnect Race Condition Guard ---');
     const client7Old = createClient();
-    await new Promise((resolve) => client7Old.on('connect', resolve));
+    await waitForConnect(client7Old);
 
     const join7Res = await new Promise((resolve) => {
       client7Old.emit('join_room', { username: 'Racer', roomCode: 'ROOM_RACE' }, resolve);
@@ -384,7 +389,7 @@ async function runSuite() {
 
     // Simulate fast page reload: New socket connects and claims session BEFORE old socket disconnect fires
     const client7New = createClient();
-    await new Promise((resolve) => client7New.on('connect', resolve));
+    await waitForConnect(client7New);
 
     let raceParticipants = [];
     client7New.on('participants_update', (d) => (raceParticipants = d.participants));

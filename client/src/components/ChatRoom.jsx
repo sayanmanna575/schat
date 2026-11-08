@@ -39,6 +39,9 @@ export default function ChatRoom({
   const inputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const isNearBottomRef = useRef(true);
+  const isInputFocusedRef = useRef(false);
+  const wasFocusedBeforeSendRef = useRef(false);
+  const isSendingRef = useRef(false);
 
   const onlineCount = participants.filter((p) => p.status !== 'disconnected').length;
 
@@ -128,6 +131,10 @@ export default function ChatRoom({
   };
 
   const handleInputFocus = () => {
+    isInputFocusedRef.current = true;
+    wasFocusedBeforeSendRef.current = false;
+    isSendingRef.current = false;
+
     // When user manually taps input, anchor to latest message if already near bottom
     if (messagesContainerRef.current && isNearBottomRef.current) {
       messagesContainerRef.current.scrollTo({
@@ -137,9 +144,26 @@ export default function ChatRoom({
     }
   };
 
+  const handleInputBlur = () => {
+    // If user tapped Send, do NOT consider keyboard manually dismissed
+    if (!isSendingRef.current) {
+      isInputFocusedRef.current = false;
+      wasFocusedBeforeSendRef.current = false;
+    }
+  };
+
   const handleSend = (e) => {
     if (e) e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!inputText.trim()) {
+      isSendingRef.current = false;
+      return;
+    }
+
+    // Determine if input was actively focused prior to sending
+    const wasFocused =
+      wasFocusedBeforeSendRef.current ||
+      isInputFocusedRef.current ||
+      document.activeElement === inputRef.current;
 
     // Immediately stop typing indicator on send
     if (typingTimeoutRef.current) {
@@ -160,14 +184,23 @@ export default function ChatRoom({
       });
     }
 
-    // Never call inputRef.current?.focus() here!
-    // If user sent with keyboard open, the input already has focus.
-    // If user dismissed the keyboard, sending must not reopen it!
+    // If user was actively typing (keyboard open), keep input focused so keyboard remains open
+    // If user had manually dismissed the keyboard (wasFocused === false), do NOT touch focus!
+    if (wasFocused && inputRef.current) {
+      inputRef.current.focus({ preventScroll: true });
+      isInputFocusedRef.current = true;
+    }
+
+    // Reset sending flags
+    isSendingRef.current = false;
+    wasFocusedBeforeSendRef.current = wasFocused;
   };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      wasFocusedBeforeSendRef.current =
+        isInputFocusedRef.current || document.activeElement === inputRef.current;
       handleSend(e);
     }
   };
@@ -499,6 +532,7 @@ export default function ChatRoom({
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
               placeholder="Type a message..."
               autoComplete="off"
               className="flex-1 min-w-0 bg-navy-900 text-slate-100 placeholder-slate-500 text-[16px] sm:text-sm px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-navy-700 focus:border-cyan-accent focus:outline-none focus:ring-1 focus:ring-cyan-accent/30 transition select-text"
@@ -506,19 +540,31 @@ export default function ChatRoom({
             <button
               type="submit"
               id="send-message-btn"
+              tabIndex={-1}
+              aria-disabled={!inputText.trim()}
+              onPointerDown={(e) => {
+                const isFocused =
+                  isInputFocusedRef.current || document.activeElement === inputRef.current;
+                if (isFocused) {
+                  wasFocusedBeforeSendRef.current = true;
+                  isSendingRef.current = true;
+                  e.preventDefault();
+                }
+              }}
               onMouseDown={(e) => {
-                if (document.activeElement === inputRef.current) {
+                const isFocused =
+                  isInputFocusedRef.current || document.activeElement === inputRef.current;
+                if (isFocused) {
+                  wasFocusedBeforeSendRef.current = true;
+                  isSendingRef.current = true;
                   e.preventDefault();
                 }
               }}
-              onTouchStart={(e) => {
-                if (document.activeElement === inputRef.current) {
-                  e.preventDefault();
-                  handleSend(e);
-                }
-              }}
-              disabled={!inputText.trim()}
-              className="bg-cyan-accent hover:bg-cyan-bright disabled:opacity-40 disabled:cursor-not-allowed text-navy-950 p-2 sm:p-2.5 rounded-xl transition flex items-center justify-center flex-shrink-0 shadow-xs active:scale-95"
+              className={`bg-cyan-accent text-navy-950 p-2 sm:p-2.5 rounded-xl transition flex items-center justify-center flex-shrink-0 shadow-xs ${
+                !inputText.trim()
+                  ? 'opacity-40 cursor-not-allowed'
+                  : 'hover:bg-cyan-bright active:scale-95'
+              }`}
               title="Send message"
             >
               <Send size={16} className="sm:w-[18px] sm:h-[18px]" />
